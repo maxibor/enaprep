@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+
+import argparse
+import random
+import pysam
+import sys
+
+
+def get_args():
+    '''This function parses and return arguments passed in'''
+    parser = argparse.ArgumentParser(
+        prog='anonymize',
+        description="""
+Anonymize a sam file by replacing DNA sequences by NNNN...
+Author: Maxime Borry - borry@shh.mpg.de
+        """
+    )
+    parser.add_argument("sam", help="Path to input sam file")
+    parser.add_argument(
+        '-o',
+        dest='output',
+        default=None,
+        help='Path to output file. Default = <input_basename>.anonym.bam'
+    )
+    args = parser.parse_args()
+    samin = args.sam
+    mode = args.mode
+    output = args.output
+
+    return(samin, mode, output)
+
+
+def getBasename(file_name):
+    if ("/") in file_name:
+        basename = file_name.split("/")[-1].split(".")[0]
+    else:
+        basename = file_name.split(".")[0]
+    return(basename)
+
+
+def anonyBam(inbam, outbam, mode="mapped"):
+    try:
+        bamin = pysam.AlignmentFile(inbam, "rb")
+        bamout = pysam.AlignmentFile(outbam, 'wb', template=bamin)
+        for i in bamin:
+            o = pysam.AlignedSegment()
+            # If anonymizing all reads is needed or read is mapped
+            if mode == "all" or len(i.cigar) > 0:
+                # replace query sequence by NNN...
+                o.query_sequence = "N"*len(i.query_sequence)
+            else:  # do nothing
+                o.query_sequence = i.query_sequence
+            o.reference_start = i.reference_start
+            o.query_name = i.query_name
+            o.flag = i.flag
+            o.reference_id = i.reference_id
+            o.mapping_quality = i.mapping_quality
+            o.cigar = i.cigar
+            o.next_reference_id = i.next_reference_id
+            o.next_reference_start = i.next_reference_start
+            o.template_length = i.template_length
+            o.query_qualities = i.query_qualities
+            o.tags = i.tags
+            bamout.write(o)
+    except ValueError as e:
+        with open("error_readme_"+outbam, "w") as o:
+            o.write("Error writing this BAM file, input bam file was erroneous")
+        print(e)
+
+
+if __name__ == "__main__":
+    INFILE, MODE, OUTFILE = get_args()
+    check_mode(MODE)
+    if not OUTFILE:
+        OUTFILE = f"{getBasename(INFILE)}.anonym.bam"
+    anonyBam(INFILE, OUTFILE, mode=MODE)
