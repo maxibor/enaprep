@@ -25,4 +25,4 @@ jobs:
           sudo mv nextflow /usr/local/bin/
       - name:  BASIC Run the basic pipeline with the test profile, PE/SE
         run: |
-          nextflow run . -profile test,conda ${{ matrix.endedness }}
+          nextflow run . -profile test,docker ${{ matrix.endedness }}
