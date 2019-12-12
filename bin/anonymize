@@ -70,7 +70,6 @@ def anonyBam(inbam, outbam, mode="mapped"):
 
 if __name__ == "__main__":
     INFILE, MODE, OUTFILE = get_args()
-    check_mode(MODE)
     if not OUTFILE:
         OUTFILE = f"{getBasename(INFILE)}.anonym.bam"
     anonyBam(INFILE, OUTFILE, mode=MODE)

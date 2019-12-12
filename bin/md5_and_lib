@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+
+import argparse
+import pandas as pd
+import argparse
+import os
+import subprocess
+
+
+def get_args():
+    '''This function parses and return arguments passed in'''
+    parser = argparse.ArgumentParser(
+        prog='md5_and_lib',
+        description="""
+Computes MD5 of fastq files and generates library template file
+Author: Maxime Borry - borry@shh.mpg.de
+        """
+    )
+    parser.add_argument(
+        '-l',
+        dest='layout',
+        default="PAIRED",
+        help='Library layout. Default = PAIRED'
+    )
+    parser.add_argument(
+        '-i',
+        dest='input_lib',
+        default=None,
+        help='Path to input library template file. Default = None'
+    )
+    parser.add_argument(
+        '-o',
+        dest='output',
+        default=None,
+        help='Path to output file. Default = <input_basename>.libraries.txt'
+    )
+    args = parser.parse_args()
+    layout = args.layout
+    lib_temp = args.input_lib
+    output = args.output
+
+    return(layout, lib_temp, output)
+
+
+def get_basename(fname):
+    return(fname.split("/")[-1].split(".")[0])
+
+
+def get_md5(fname):
+    return(subprocess.check_output(["md5", fname]).split()[-1].decode())
+
+
+def get_fastq(pattern=".trimmed.fastq.gz"):
+    fastq = [i for i in os.listdir() if i.endswith(pattern)]
+    fq_dict = {}
+    for f in fastq:
+        basename = get_basename(f)
+        if basename not in fq_dict.keys():
+            fq_dict[basename] = [f]
+        else:
+            fq_dict[basename].append(f)
+    return(fq_dict)
+
+
+def prep_layout(fq_dict, layout, lib_temp, outfile):
+    i = 0
+    l = pd.read_csv(lib_temp, sep="\t")
+    for k in fq_dict:
+        for f in fq_dict[k]:
+            l.loc[i, "library_name"] = k
+            l.loc[i, "library_layout"] = layout
+            l.loc[i, "file_name"] = f
+            l.loc[i, "file_md5"] = get_md5(f)
+            i += 1
+    l.fillna("", inplace=True)
+    l.to_csv(outfile, index=False, sep="\t")
+
+
+if __name__ == "__main__":
+    LAYOUT, LIB_TEMP, OUTPUT = get_args()
+
+    fq = get_fastq()
+    prep_layout(fq_dict=fq, layout=LAYOUT, lib_temp=LIB_TEMP, outfile=OUTPUT)

@@ -1,0 +1,28 @@
+name: enaprep_ci
+#This workflow is triggered on pushes and PRs to the repository.
+on: [push, pull_request]  
+
+jobs:
+  conda_build:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v1
+      - name: Try Creating Conda env
+        run: |
+          conda env create --prefix nf-core-enaprep-1.0dev --file environment.yml
+  github_actions_ci:
+    runs-on: ubuntu-latest
+    env:
+      NXF_ANSI_LOG: 0
+    strategy:
+      matrix:
+        endedness: ['--singleEnd', '']
+    steps:
+      - uses: actions/checkout@v1
+      - name: Install Nextflow
+        run: |
+          wget -qO- get.nextflow.io | bash
+          sudo mv nextflow /usr/local/bin/
+      - name:  BASIC Run the basic pipeline with the test profile, PE/SE
+        run: |
+          nextflow run . -profile test,conda ${{ matrix.endedness }}

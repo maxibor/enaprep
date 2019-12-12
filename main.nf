@@ -29,9 +29,7 @@ def helpMessage() {
       --genome                      Name of iGenomes reference. Default = ${params.genome}
       --singleEnd                   Specifies that the input is single end reads. Default = ${params.singleEnd}
       --adapterList                 Specifies the adapter sequences file. Default = ${params.adapterList}
-
-    References                      If not specified in the configuration file or you wish to overwrite any of the references.
-      --fasta                       Path to Fasta reference. Default = ${params.fasta}
+      --phred                       Sequence quality encoding. Default = ${params.phred}
 
     Other options:
       --outdir                      The output directory where the results will be saved. Default = ${params.outdir}
@@ -56,10 +54,6 @@ if (params.help) {
  * SET UP CONFIGURATION VARIABLES
  */
 
-// Check if genome exists in the config file
-if (params.genomes && params.genome && !params.genomes.containsKey(params.genome)) {
-    exit 1, "The provided genome '${params.genome}' is not available in the iGenomes file. Currently the available genomes are ${params.genomes.keySet().join(", ")}"
-}
 
 // TODO nf-core: Add any reference files that are needed
 // Configurable reference genomes
@@ -69,8 +63,7 @@ if (params.genomes && params.genome && !params.genomes.containsKey(params.genome
 //   input:
 //   file fasta from ch_fasta
 //
-params.fasta = params.genome ? params.genomes[ params.genome ].fasta ?: false : false
-if (params.fasta) { ch_fasta = file(params.fasta, checkIfExists: true) }
+
 
 // Has the run name been specified by the user?
 //  this has the bonus effect of catching both -name and --name
@@ -117,33 +110,6 @@ if (params.readPaths) {
         .set {read_files_trimming }
 }
 
-// Genome index for Bowtie
-fasta = params.genome ? params.genomes[ params.genome ].fasta ?: false : false
-bt = params.genome ? params.genomes[ params.genome ].bowtie2 ?: false : false
-if ( params.fasta ){
-    fasta = file(params.fasta)
-} else if (fasta) {
-    fasta = file(params.genomes[ params.genome ].fasta, checkIfExists: true)
-}
-if( !fasta.exists() ) exit 1, "Fasta file not found: ${params.fasta}"
-
-if (params.index) {
-    bt = params.index
-}
-if (bt) {
-    lastPath = bt.lastIndexOf(File.separator)
-    bt_dir = bt.substring(0, lastPath+1)
-    bt_index = bt.substring(lastPath+1)
-
-    Channel
-        .fromPath(bt_dir+"/*.bt2")
-        .ifEmpty {exit 1, "Cannot find any index matching : ${bt}\n"}
-        .collect()
-        .set {bt_ch}
-} else {
-    bt_index = params.name
-}
-
 // Header log info
 log.info nfcoreHeader()
 def summary = [:]
@@ -151,7 +117,6 @@ if (workflow.revision) summary['Pipeline Release'] = workflow.revision
 summary['Run Name']         = custom_runName ?: workflow.runName
 // TODO nf-core: Report custom parameters here
 summary['Reads']            = params.reads
-summary['Fasta Ref']        = params.fasta
 summary['Data Type']        = params.singleEnd ? 'Single-End' : 'Paired-End'
 summary['Max Resources']    = "$params.max_memory memory, $params.max_cpus cpus, $params.max_time time per job"
 if (workflow.containerEngine) summary['Container'] = "$workflow.containerEngine - $workflow.container"
@@ -197,31 +162,6 @@ ${summary.collect { k,v -> "            <dt>$k</dt><dd><samp>${v ?: '<span style
 }
 
 /*
- * Parse software version numbers
- */
-process get_software_versions {
-    publishDir "${params.outdir}/pipeline_info", mode: 'copy',
-        saveAs: { filename ->
-            if (filename.indexOf(".csv") > 0) filename
-            else null
-        }
-
-    output:
-    file 'software_versions_mqc.yaml' into software_versions_yaml
-    file "software_versions.csv"
-
-    script:
-    // TODO nf-core: Get all tools to print their version number here
-    """
-    echo $workflow.manifest.version > v_pipeline.txt
-    echo $workflow.nextflow.version > v_nextflow.txt
-    fastqc --version > v_fastqc.txt
-    multiqc --version > v_multiqc.txt
-    scrape_software_versions.py &> software_versions_mqc.yaml
-    """
-}
-
-/*
  * STEP 1 - AdapterRemoval
  */
 
@@ -233,153 +173,54 @@ process get_software_versions {
     input:
         set val(name), file(reads) from read_files_trimming
 
-    publishDir("${params.outdir}/trimmed_reads", mode="copy")
+    publishDir "${params.outdir}/trimmed_reads", mode: "copy"
 
     output:
-        set val(name), file('*.trimmed.fastq') into trimmed_reads_md5, trimmed_reads_mapping
+        set val(name), file('*.trimmed.fastq.gz') into fq_to_md5
         file("*.settings") into adapter_removal_results
 
     script:
         settings = name+".settings"
         if (! params.singleEnd){
-            out1 = name+".pair1.trimmed.fastq"
-            out2 = name+".pair2.trimmed.fastq"
+            out1 = name+".R1.trimmed.fastq.gz"
+            out2 = name+".R2.trimmed.fastq.gz"
             """
-            AdapterRemoval --basename $name --file1 ${reads[0]} --file2 ${reads[1]} --output1 $out1 --output2 $out2 --threads ${task.cpus} --qualitybase ${params.phred} --settings $settings
+            AdapterRemoval --gzip --basename $name --file1 ${reads[0]} --file2 ${reads[1]} --output1 $out1 --output2 $out2 --threads ${task.cpus} --qualitybase ${params.phred} --settings $settings
             """
         } else {
-            se_out = name+".trimmed.fastq"
+            se_out = name+".trimmed.fastq.gz"
             """
-            AdapterRemoval --basename $name --file1 ${reads[0]} --output1 $se_out --threads ${task.cpus} --qualitybase ${params.phred} --settings $settings
+            AdapterRemoval --gzip --basename $name --file1 ${reads[0]} --output1 $se_out --threads ${task.cpus} --qualitybase ${params.phred} --settings $settings
             """
         }      
 }
 
-/*
- * STEP 2.0 - Creating Bowtie2 Index
- */
-
-if (!bt){
-    // 1.2:   Bowtie Indexing of Genome
-    process BowtieIndexGenome {
-
-        label 'intenso'
-
-        input:
-            file(fasta) from genomeFasta
-        output:
-            file("*.bt2") into bt_ch
-        script:
-            """
-            bowtie2-build $fasta ${bt_index}
-            """
-    }
-}
-
-/*
- * STEP 2.1 - Mapping agains the human genome
- */
-
-
- process Bowtie2Align {
-    tag "$name"
-
-    conda 'bioconda::bowtie2 bioconda::samtools'
-
-    errorStrategy 'ignore'
-
-    label 'intenso'
-
-    input:
-        set val(name), file(reads) from trimmed_reads
-        file(index) from bt_ch.collect()
-    output:
-        set val(name), file("*.aligned.sorted.bam") into alignment_genome
-        set val(name), file("*.flagstat.txt") into align1_multiqc
-    script:
-        index_name = index.toString().tokenize(' ')[0].tokenize('.')[0]
-        samfile = name+".aligned.sam"
-        fstat = name+".flagstat.txt"
-        outfile = name+".aligned.sorted.bam"
-        if (params.pairedEnd) {
-            """
-            bowtie2 -x $index_name -1 ${reads[0]} -2 ${reads[1]} $bowtie_setting --threads ${task.cpus} > $samfile
-            samtools view -S -b -@ ${task.cpus} $samfile | samtools sort -@ ${task.cpus} -o $outfile
-            samtools flagstat $outfile > $fstat
-            """
-        } else {
-            """
-            bowtie2 -x $index_name -U ${reads[0]} $bowtie_setting --threads ${task.cpus} > $samfile
-            samtools view -S -b -@ ${task.cpus} $samfile | samtools sort -@ ${task.cpus} -o $outfile
-            samtools flagstat $outfile > $fstat
-            """
-        }
-}
-
-/*
- * STEP 3 - Anonymizing
- */
-
-process anonymize {
-    tag "$name"
-
-    label 'ristretto'
-
-    echo true
-
-    input:
-        set val(name), file(sam) from alignment_genome
-    output:
-        set val(name), file("*.anonym.bam") into anonybam
-    script:
-        outfile = name+".anonym.bam" 
-        """
-        anonymize -o $outfile $sam
-        """
-}
-
-process bam2fq {
-    tag "$name"
-
-    label 'ristretto'
-
-    publishDir "${params.outdir}/anonymized", mode: 'copy'
-
-    input:
-        set val(name), file(bam) from anonybam
-    output:
-
-    script:
-        if (! params.singleEnd){
-            fwd = bam.baseName+".R1.fastq.gz"
-            rev = bam.baseName+".R2.fastq.gz"
-            """
-            samtools fastq -c 6 -@ ${task.cpus} -1 $fwd -2 $rev $bam
-            """
-        } else {
-            out = bam.baseName+".fastq.gz"
-            """
-            samtools fastq -c 6 -@ ${task.cpus} -o $out $bam 
-            """
-        }
-}
 
 /*
  * STEP 4 - Computing MD5
  */
 
+if (params.singleEnd){
+    layout = "SINGLE"
+} else {
+    layout = "PAIRED"
+}
 
+process comp_md5 {
 
-/*
- * STEP 5 - Creating template sample and library files
- */
+    publishDir "${params.outdir}/ena_registration", mode: "copy"
 
-
-/*
- * STEP 6 - MultiQC
- */
-
-
+    input:
+        set val(name), file(fq) from fq_to_md5.collect()
+    output:
+        file("*.txt") into registration
+    script:
+        outfile = "ena_library_registration.txt"
+        """
+        md5_and_lib -l $layout -i ${params.library_reg} -o $outfile
+        cat ${params.sample_reg} > "ena_sample_registration.txt"
+        """
+}
 
 process multiqc {
     publishDir "${params.outdir}/MultiQC", mode: 'copy'
@@ -387,8 +228,7 @@ process multiqc {
     input:
     file multiqc_config from ch_multiqc_config
     // TODO nf-core: Add in log files from your new processes for MultiQC to find!
-    file ('fastqc/*') from fastqc_results.collect().ifEmpty([])
-    file ('software_versions/*') from software_versions_yaml.collect()
+    file ('AdapterRemoval/*') from adapter_removal_results.collect().ifEmpty([])
     file workflow_summary from create_workflow_summary(summary)
 
     output:
@@ -402,24 +242,6 @@ process multiqc {
     // TODO nf-core: Specify which MultiQC modules to use with -m for a faster run time
     """
     multiqc -f $rtitle $rfilename --config $multiqc_config .
-    """
-}
-
-/*
- * STEP 3 - Output Description HTML
- */
-process output_documentation {
-    publishDir "${params.outdir}/pipeline_info", mode: 'copy'
-
-    input:
-    file output_docs from ch_output_docs
-
-    output:
-    file "results_description.html"
-
-    script:
-    """
-    markdown_to_html.r $output_docs results_description.html
     """
 }
 

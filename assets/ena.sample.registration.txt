@@ -1,0 +1,3 @@
+#checklist_accession	ERC000011				
+#unique_name_prefix					
+sample_alias	tax_id	scientific_name	sample_title	geographic location (country and/or sea)	geographic location (region and locality)

@@ -13,6 +13,7 @@
   * [`-profile`](#-profile)
   * [`--reads`](#--reads)
   * [`--singleEnd`](#--singleend)
+  * [`--adapterList`](#--adapterList)
 * [Reference genomes](#reference-genomes)
   * [`--genome` (using iGenomes)](#--genome-using-igenomes)
   * [`--fasta`](#--fasta)
