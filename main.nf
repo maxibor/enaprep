@@ -176,7 +176,7 @@ ${summary.collect { k,v -> "            <dt>$k</dt><dd><samp>${v ?: '<span style
     publishDir "${params.outdir}/trimmed_reads", mode: "copy"
 
     output:
-        set val(name), file('*.trimmed.fastq.gz') into fq_to_md5
+        file('*.trimmed.fastq.gz') into fq_to_md5
         file("*.settings") into adapter_removal_results
 
     script:
@@ -211,7 +211,7 @@ process comp_md5 {
     publishDir "${params.outdir}/ena_registration", mode: "copy"
 
     input:
-        set val(name), file(fq) from fq_to_md5.collect()
+        file(fq) from fq_to_md5.collect()
     output:
         file("*.txt") into registration
     script:
