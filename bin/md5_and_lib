@@ -69,6 +69,8 @@ def get_fastq(pattern=".trimmed.fastq.gz"):
             fq_dict[basename] = [f]
         else:
             fq_dict[basename].append(f)
+    for k in fq_dict:
+        fq_dict[k] = sorted(fq_dict[k])
     return(fq_dict)
 
 
@@ -76,12 +78,18 @@ def prep_layout(fq_dict, layout, lib_temp, outfile):
     i = 0
     l = pd.read_csv(lib_temp, sep="\t")
     for k in fq_dict:
-        for f in fq_dict[k]:
+        if layout == "SINGLE":
             l.loc[i, "library_name"] = k
-            l.loc[i, "library_layout"] = layout
-            l.loc[i, "file_name"] = f
-            l.loc[i, "file_md5"] = get_md5(f)
-            i += 1
+            l.loc[i, "file_name"] = fq_dict[k][0]
+            l.loc[i, "file_md5"] = get_md5(fq_dict[k][0])
+        else:
+            l.loc[i, "library_name"] = k
+            l.loc[i, "forward_file_name"] = fq_dict[k][0]
+            l.loc[i, "forward_file_md5"] = get_md5(fq_dict[k][0])
+            l.loc[i, "reverse_file_name"] = fq_dict[k][1]
+            l.loc[i, "reverse_file_md5"] = get_md5(fq_dict[k][0])
+
+        i += 1
     l.fillna("", inplace=True)
     l.to_csv(outfile, index=False, sep="\t")
 

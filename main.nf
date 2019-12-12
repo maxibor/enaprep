@@ -202,8 +202,10 @@ ${summary.collect { k,v -> "            <dt>$k</dt><dd><samp>${v ?: '<span style
 
 if (params.singleEnd){
     layout = "SINGLE"
+    lib_temp = "$baseDir/assets/experiment_single_fastq_spreadsheet_template.tsv"
 } else {
     layout = "PAIRED"
+    lib_temp = "$baseDir/assets/experiment_paired_fastq_spreadsheet_template.tsv"
 }
 
 process comp_md5 {
@@ -217,7 +219,7 @@ process comp_md5 {
     script:
         outfile = "ena_library_registration.txt"
         """
-        md5_and_lib -l $layout -i ${params.library_reg} -o $outfile
+        md5_and_lib -l $layout -i $lib_temp -o $outfile
         cat ${params.sample_reg} > "ena_sample_registration.txt"
         """
 }
