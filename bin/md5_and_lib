@@ -42,8 +42,14 @@ Author: Maxime Borry - borry@shh.mpg.de
     return(layout, lib_temp, output)
 
 
+# Zape_23_ACACGGTT-ACCGACAA.R1.trimmed.fastq.gz
+
 def get_basename(fname):
-    return(fname.split("/")[-1].split(".")[0])
+    filename = (fname.split("/")[-1]
+                .replace(".trimmed.fastq.gz", "")
+                .replace(".R1", "")
+                .replace(".R2", ""))
+    return(filename)
 
 
 def get_md5(fname):
