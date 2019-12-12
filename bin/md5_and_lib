@@ -47,7 +47,11 @@ def get_basename(fname):
 
 
 def get_md5(fname):
-    return(subprocess.check_output(["md5", fname]).split()[-1].decode())
+    try:
+        md5 = subprocess.check_output(["md5", fname]).split()[-1].decode()
+    except FileNotFoundError:
+        md5 = subprocess.check_output(["md5sum", fname]).split()[0].decode()
+    return(md5)
 
 
 def get_fastq(pattern=".trimmed.fastq.gz"):
