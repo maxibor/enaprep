@@ -168,7 +168,7 @@ ${summary.collect { k,v -> "            <dt>$k</dt><dd><samp>${v ?: '<span style
  process AdapterRemoval {
     tag "$name"
 
-    label 'process_medium'
+    label 'process_short'
 
     input:
         set val(name), file(reads) from read_files_trimming
