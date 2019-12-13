@@ -21,14 +21,14 @@ ii. Install one of [`docker`](https://docs.docker.com/engine/installation/), [`s
 iii. Download the pipeline and test it on a minimal dataset with a single command
 
 ```bash
-nextflow run nf-core/enaprep -profile test,<docker/singularity/conda>
+nextflow run maxibor/enaprep -profile test,<docker/singularity/conda>
 ```
 
 iv. Start running your own analysis!
 
 <!-- TODO nf-core: Update the default command above used to run the pipeline -->
 ```bash
-nextflow run nf-core/enaprep -profile <docker/singularity/conda> --reads '*_R{1,2}.fastq.gz'
+nextflow run maxibor/enaprep -profile <docker/singularity/conda> --reads '*_R{1,2}.fastq.gz'
 ```
 
 See [usage docs](docs/usage.md) for all of the available options when running the pipeline.
