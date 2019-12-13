@@ -42,13 +42,20 @@ Author: Maxime Borry - borry@shh.mpg.de
     return(layout, lib_temp, output)
 
 
-# Zape_23_ACACGGTT-ACCGACAA.R1.trimmed.fastq.gz
+# library_name.R1.trimmed.fastq.gz
+# library_name.R2.trimmed.fastq.gz
 
 def get_basename(fname):
-    filename = (fname.split("/")[-1]
-                .replace(".trimmed.fastq.gz", "")
-                .replace(".R1", "")
-                .replace(".R2", ""))
+    filename = fname.split("/")[-1]
+    file_extensions = [".R1",
+                       ".R2",
+                       ".trimmed",
+                       ".fastq",
+                       ".fq",
+                       ".gz"]
+
+    for i in file_extensions:
+        filename = filename.replace(i, "")
     return(filename)
 
 
