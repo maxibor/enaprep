@@ -94,7 +94,7 @@ def prep_layout(fq_dict, layout, lib_temp, outfile):
             l.loc[i, "forward_file_name"] = fq_dict[k][0]
             l.loc[i, "forward_file_md5"] = get_md5(fq_dict[k][0])
             l.loc[i, "reverse_file_name"] = fq_dict[k][1]
-            l.loc[i, "reverse_file_md5"] = get_md5(fq_dict[k][0])
+            l.loc[i, "reverse_file_md5"] = get_md5(fq_dict[k][1])
 
         i += 1
     l.fillna("", inplace=True)
